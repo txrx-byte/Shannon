@@ -1,0 +1,18 @@
+apiVersion: v2
+name: logless-agent
+description: Zero-ETL Edge Telemetry Agent. Filters K8s logs and ships Parquet to R2/S3.
+type: application
+version: 0.1.0
+appVersion: "0.4.0"
+keywords:
+  - observability
+  - logging
+  - duckdb
+  - parquet
+  - edge
+home: https://github.com/logless-io/logless
+sources:
+  - https://github.com/logless-io/logless
+maintainers:
+  - name: LogLess Team
+    email: team@logless.io
