@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "logless-agent.fullname" . }}
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app.kubernetes.io/name: {{ include "logless-agent.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "logless-agent.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "logless-agent.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      serviceAccountName: {{ include "logless-agent.serviceAccountName" . }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: shannon-agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: S3_BUCKET
+              value: {{ .Values.storage.bucket | quote }}
+            - name: AWS_REGION
+              value: {{ .Values.storage.region | quote }}
+            - name: FLUSH_INTERVAL_SECS
+              value: {{ .Values.agent.flushIntervalSecs | quote }}
+            - name: BATCH_SIZE
+              value: {{ .Values.agent.batchSize | quote }}
+            - name: LOG_PATH_PATTERN
+              value: {{ .Values.agent.logPathPattern | quote }}
+            - name: RUST_LOG
+              value: "info"
+          envFrom:
+            - secretRef:
+                name: {{ if .Values.storage.existingSecret }}{{ .Values.storage.existingSecret }}{{ else }}{{ include "logless-agent.fullname" . }}-auth{{ end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+            - name: varlibdockercontainers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+          livenessProbe:
+            exec:
+              command: ["pgrep", "shannon-agent"]
+            initialDelaySeconds: 30
+            periodSeconds: 60
+          readinessProbe:
+            exec:
+              command: ["pgrep", "shannon-agent"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: varlog
+          hostPath:
+            path: /var/log
+            type: Directory
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+            type: Directory
